@@ -1,0 +1,278 @@
+#include <Adafruit_Fingerprint.h>
+#include <WiFi.h> 
+#include <WiFiClient.h> 
+#include "certificados.h" 
+#include <MQTT.h> 
+WiFiClient conexao; 
+MQTTClient mqtt(1000);
+
+#define mySerial Serial1
+
+#endif
+
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+
+uint8_t id;
+
+uint8_t readnumber(void) {
+  uint8_t num = 0;
+
+  while (num == 0) {
+    while (! Serial.available());
+    num = Serial.parseInt();
+  }
+  return num;
+}
+
+void reconectarMQTT() { 
+ if (!mqtt.connected()) { 
+ Serial.print("Conectando MQTT..."); 
+ while(!mqtt.connected()) { 
+ mqtt.connect("SEU ID", "LOGIN", "SENHA"); 
+ Serial.print("."); 
+ delay(1000); 
+ } 
+ Serial.println(" conectado!"); 
+ 
+ mqtt.subscribe("topico1"); // qos = 0 
+ mqtt.subscribe("topico2/+/parametro", 1); // qos = 1 
+ } 
+}
+
+void reconectarWiFi() { 
+ if (WiFi.status() != WL_CONNECTED) { 
+ WiFi.begin("NOME DA REDE", "SENHA DA REDE"); 
+ Serial.print("Conectando ao WiFi..."); 
+ while (WiFi.status() != WL_CONNECTED) { 
+ Serial.print("."); 
+ delay(1000); 
+ } 
+ Serial.print("conectado!\nEndereço IP: "); 
+ Serial.println(WiFi.localIP()); 
+ } 
+}
+
+void setup()
+{
+  Serial.begin(9600);
+  delay(100);
+
+  // Sensor de dedinho 123
+  Serial1.begin(57600, SERIAL_8N1, 44, 43);
+  finger.begin(57600);
+  delay(5);
+  while(!finger.verifyPassword()){
+    Serial.println("Did not find fingerprint sensor :(");
+    delay(1000);
+  }
+
+  Serial.println("Found fingerprint sensor!");
+  finger.getTemplateCount();
+  if (finger.templateCount == 0) {
+    Serial.print("Sensor doesn't contain any fingerprint data.");
+  }
+  else {
+    Serial.println("Waiting for valid finger...");
+    Serial.print("Sensor contains "); Serial.print(finger.templateCount); Serial.println(" templates");
+  }
+
+  // conexão com MQTT
+  reconectarWiFi();
+  conexaoSegura.setCACert(certificado1);
+  mqtt.begin("mqtt.janks.dev.br", 1883, conexao);
+  reconectarMQTT();
+}
+unsigned long instanteAnterior = 0;
+void loop()
+{
+  unsigned long instanteAtual = millis();
+  if (instanteAtual > instanteAnterior + 1000) {
+    getFingerprintIDez();
+    instanteAnterior = instanteAtual; 
+  }
+
+  if (Serial.available() > 0) {
+  String texto = Serial.readStringUntil('\n');
+  if(texto == "cadastra"){
+    enroll();
+  }
+  }
+
+  reconectarWiFi(); 
+  reconectarMQTT(); 
+  mqtt.loop(); 
+}
+
+
+
+void enroll() // run over and over again
+{
+  Serial.println("Ready to enroll a fingerprint!");
+  Serial.println("Please type in the ID # (from 1 to 127) you want to save this finger as...");
+  id = readnumber();
+  if (id == 0) {// ID #0 not allowed, try again!
+     return;
+  }
+  Serial.print("Enrolling ID #");
+  Serial.println(id);
+
+  while (! getFingerprintEnroll() );
+}
+
+uint8_t getFingerprintEnroll() {
+
+  int p = -1;
+  Serial.print("Waiting for valid finger to enroll as #"); Serial.println(id);
+  while (p != FINGERPRINT_OK) {
+    p = finger.getImage();
+    switch (p) {
+    case FINGERPRINT_OK:
+      Serial.println("Image taken");
+      break;
+    case FINGERPRINT_NOFINGER:
+      Serial.print(".");
+      break;
+    case FINGERPRINT_PACKETRECIEVEERR:
+      Serial.println("Communication error");
+      break;
+    case FINGERPRINT_IMAGEFAIL:
+      Serial.println("Imaging error");
+      break;
+    default:
+      Serial.println("Unknown error");
+      break;
+    }
+  }
+
+  // OK success!
+
+  p = finger.image2Tz(1);
+  switch (p) {
+    case FINGERPRINT_OK:
+      Serial.println("Image converted");
+      break;
+    case FINGERPRINT_IMAGEMESS:
+      Serial.println("Image too messy");
+      return p;
+    case FINGERPRINT_PACKETRECIEVEERR:
+      Serial.println("Communication error");
+      return p;
+    case FINGERPRINT_FEATUREFAIL:
+      Serial.println("Could not find fingerprint features");
+      return p;
+    case FINGERPRINT_INVALIDIMAGE:
+      Serial.println("Could not find fingerprint features");
+      return p;
+    default:
+      Serial.println("Unknown error");
+      return p;
+  }
+
+  Serial.println("Remove finger");
+  delay(2000);
+  p = 0;
+  while (p != FINGERPRINT_NOFINGER) {
+    p = finger.getImage();
+  }
+  Serial.print("ID "); Serial.println(id);
+  p = -1;
+  Serial.println("Place same finger again");
+  while (p != FINGERPRINT_OK) {
+    p = finger.getImage();
+    switch (p) {
+    case FINGERPRINT_OK:
+      Serial.println("Image taken");
+      break;
+    case FINGERPRINT_NOFINGER:
+      Serial.print(".");
+      break;
+    case FINGERPRINT_PACKETRECIEVEERR:
+      Serial.println("Communication error");
+      break;
+    case FINGERPRINT_IMAGEFAIL:
+      Serial.println("Imaging error");
+      break;
+    default:
+      Serial.println("Unknown error");
+      break;
+    }
+  }
+
+  // OK success!
+
+  p = finger.image2Tz(2);
+  switch (p) {
+    case FINGERPRINT_OK:
+      Serial.println("Image converted");
+      break;
+    case FINGERPRINT_IMAGEMESS:
+      Serial.println("Image too messy");
+      return p;
+    case FINGERPRINT_PACKETRECIEVEERR:
+      Serial.println("Communication error");
+      return p;
+    case FINGERPRINT_FEATUREFAIL:
+      Serial.println("Could not find fingerprint features");
+      return p;
+    case FINGERPRINT_INVALIDIMAGE:
+      Serial.println("Could not find fingerprint features");
+      return p;
+    default:
+      Serial.println("Unknown error");
+      return p;
+  }
+
+  // OK converted!
+  Serial.print("Creating model for #");  Serial.println(id);
+
+  p = finger.createModel();
+  if (p == FINGERPRINT_OK) {
+    Serial.println("Prints matched!");
+  } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
+    Serial.println("Communication error");
+    return p;
+  } else if (p == FINGERPRINT_ENROLLMISMATCH) {
+    Serial.println("Fingerprints did not match");
+    return p;
+  } else {
+    Serial.println("Unknown error");
+    return p;
+  }
+
+  Serial.print("ID "); Serial.println(id);
+  p = finger.storeModel(id);
+  if (p == FINGERPRINT_OK) {
+    Serial.println("Stored!");
+  } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
+    Serial.println("Communication error");
+    return p;
+  } else if (p == FINGERPRINT_BADLOCATION) {
+    Serial.println("Could not store in that location");
+    return p;
+  } else if (p == FINGERPRINT_FLASHERR) {
+    Serial.println("Error writing to flash");
+    return p;
+  } else {
+    Serial.println("Unknown error");
+    return p;
+  }
+
+  return true;
+}
+
+int getFingerprintIDez() {
+  uint8_t p = finger.getImage();
+  if (p != FINGERPRINT_OK)  return -1;
+
+  p = finger.image2Tz();
+  if (p != FINGERPRINT_OK)  return -1;
+
+  p = finger.fingerFastSearch();
+  if (p == FINGERPRINT_OK) mqtt.publish("catraca", finger.fingerID)
+  else return -1;
+
+  // found a match!
+  Serial.print("Found ID #"); Serial.print(finger.fingerID);
+  Serial.print(" with confidence of "); Serial.println(finger.confidence);
+  return finger.fingerID;
+}
