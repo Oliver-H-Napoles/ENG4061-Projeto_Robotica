@@ -33,7 +33,7 @@ function initializeWebSocket() {
 
     // Evento: Conectado
     appState.socket.on('connect', () => {
-        console.log('✅ Conectado ao servidor');
+        console.log('Conectado ao servidor');
         appState.connected = true;
         updateConnectionStatus(true);
         addLogEntry('Sistema conectado ao servidor', 'received');
@@ -41,7 +41,7 @@ function initializeWebSocket() {
 
     // Evento: Desconectado
     appState.socket.on('disconnect', () => {
-        console.log('❌ Desconectado do servidor');
+        console.log('Desconectado do servidor');
         appState.connected = false;
         updateConnectionStatus(false);
         addLogEntry('Conexão perdida com o servidor', 'sent');
@@ -49,32 +49,32 @@ function initializeWebSocket() {
 
     // Evento: Resposta de Pong
     appState.socket.on('pong', (data) => {
-        console.log('🏓 PONG recebido:', data);
+        console.log('PONG recebido:', data);
         const message = `PONG recebido em ${data.timestamp}`;
         addLogEntry(message, 'received');
     });
 
     // Evento: Status do Sistema
     appState.socket.on('system_status', (data) => {
-        console.log('📊 Status do sistema:', data);
+        console.log('Status do sistema:', data);
         appState.systemState = data;
         updateSystemInfo(data);
     });
 
     // Evento: Confirmação de Comando
     appState.socket.on('command_ack', (data) => {
-        console.log('✔ Comando reconhecido:', data);
+        console.log('Comando reconhecido:', data);
     });
 
     // Evento: Status do Garfo
     appState.socket.on('fork_status', (data) => {
-        console.log('🔧 Status do garfo:', data);
+        console.log('Status do garfo:', data);
         document.getElementById('fork-height').textContent = `${data.height} cm`;
     });
 
     // Evento: Status do Vídeo
     appState.socket.on('video_status', (data) => {
-        console.log('📹 Status do vídeo:', data);
+        console.log('Status do vídeo:', data);
     });
 }
 
@@ -127,7 +127,7 @@ function sendPing() {
         client: 'web_interface'
     };
 
-    console.log('🏓 Enviando PING:', data);
+    console.log('Enviando PING:', data);
     appState.socket.emit('ping', data);
     addLogEntry(`PING enviado em ${timestamp}`, 'sent');
 }
@@ -244,11 +244,10 @@ function addLogEntry(message, type) {
     entry.className = `log-entry ${type}`;
     
     const timestamp = new Date().toLocaleTimeString('pt-BR');
-    const icon = type === 'sent' ? '📤' : '📥';
     
     entry.innerHTML = `
         <span class="log-timestamp">[${timestamp}]</span>
-        ${icon} ${message}
+        ${message}
     `;
 
     logContainer.appendChild(entry);
