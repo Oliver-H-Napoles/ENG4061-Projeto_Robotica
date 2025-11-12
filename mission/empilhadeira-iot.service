@@ -1,0 +1,24 @@
+[Unit]
+Description=Empilhadeira Autônoma - Sistema de Controle de Missão
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/empilhadeira-iot
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+ExecStart=/usr/bin/python3 /home/pi/empilhadeira-iot/app.py
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=empilhadeira-iot
+
+# Segurança (opcional)
+# NoNewPrivileges=true
+# PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

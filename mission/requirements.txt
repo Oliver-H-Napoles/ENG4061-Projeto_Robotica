@@ -1,0 +1,43 @@
+# ===================================================================
+# EMPILHADEIRA AUTÔNOMA - DEPENDÊNCIAS PYTHON
+# Sistema de Controle de Missão
+# ===================================================================
+
+# Framework Web
+Flask==3.0.0
+flask-socketio==5.3.5
+
+# WebSocket & Async
+python-socketio==5.10.0
+python-engineio==4.8.0
+eventlet==0.33.3
+
+# Servidor WSGI (alternativa ao eventlet)
+# gevent==23.9.1
+# gevent-websocket==0.10.1
+
+# Utilitários
+python-dotenv==1.0.0
+
+# ===================================================================
+# DEPENDÊNCIAS FUTURAS (Descomente quando necessário)
+# ===================================================================
+
+# Visão Computacional
+# opencv-python==4.8.1.78
+# opencv-contrib-python==4.8.1.78
+# numpy==1.24.3
+
+# QR Code / Aruco
+# pyzbar==0.1.9
+# pillow==10.1.0
+
+# Hardware (GPIO - apenas no Raspberry Pi)
+# RPi.GPIO==0.7.1
+# pigpio==1.78
+
+# Controle PID
+# simple-pid==2.0.0
+
+# Comunicação Serial (se necessário)
+# pyserial==3.5
