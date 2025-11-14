@@ -1,5 +1,6 @@
 import pigpio
 import time
+import threading
 
 
 class DCMotor:
@@ -50,26 +51,71 @@ class DCMotor:
         self.pi.stop()  # e mata conexão com o rpi
 
 
-rodaEsq = DCMotor(12, 5, 6, 500)
-rodaDir = DCMotor(13, 7, 8, 500)
+class Encoder:
+    def __init__(self, interrupt_pin: int, ppr: int, debounce_us: float=0):
+        """
+        interrupt_pin: o pino que vai receber os pulsos do OUT do encoder.
+        ppr: (pulses per revolution) quantos pulsos o encoder gera para uma volta completa.
+        debounce_us: em microssegundos, o intervalo de debounce (ignora pulsos dentro do intervalo)
+        """
 
-while True:     # rotina de teste
-    rodaEsq.forward(50)
-    rodaDir.forward(50)
+        self.interrupt_pin = interrupt_pin
+        self.ppr = ppr
+        self.debounce_us = debounce_us
 
-    time.sleep(3)
+        self.last_tick = 0
+        self.pulses = 0
+        self._lock = threading.Lock()
 
-    rodaEsq.stop()
-    rodaDir.stop()
+        self._last_calc_time = time.time()
+        self._last_calc_pulses = 0
 
-    time.sleep(1)
+        self.pi = pigpio.pi()
+        if not self.pi.connected:
+            raise RuntimeError("pigpio não conseguiu conectar-se à placa!")
+        
+        self.pi.set_mode(self.interrupt_pin, pigpio.INPUT)
 
-    rodaEsq.reverse(50)
-    rodaDir.reverse(50)
+        self._cb = self.pi.callback(
+            interrupt_pin,
+            pigpio.EITHER_EDGE,
+            self._pulse_callback
+        )
 
-    time.sleep(3)
+    def _pulse_callback(self, gpio, level, tick):
+        if self.debounce_us > 0:
+            if (tick - self.last_tick) < self.debounce_us:
+                return      # está dentro do intervalo de debouncing
+            self.last_tick = tick
+        
+        with self._lock:    # evita concorrência de threads
+            self.pulses += 1
+    
+    def get_pulses(self):
+        with self._lock:
+            return self.pulses
+        
+    def reset(self):
+        with self._lock:
+            self.pulses = 0
+    
+    def get_rpm(self):
+        now = time.time()
+        dt = now - self._last_calc_time
+        
+        if dt <= 0:
+            return 0
 
-    rodaEsq.stop()
-    rodaDir.stop()
+        pulses_now = self.get_pulses()
+        dp = pulses_now - self._last_calc_pulses
 
-    time.sleep(1)
+        self._last_calc_time = now
+        self._last_calc_pulses = pulses_now
+
+        revolutions = dp / self.ppr
+        
+        return (revolutions / dt) * 60.0    # rpm!
+    
+    def stop(self):
+        self._cb.cancel()
+        self.pi.stop()
