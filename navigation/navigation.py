@@ -1,3 +1,4 @@
+import math
 import pigpio
 import time
 import threading
@@ -54,6 +55,7 @@ class DCMotor:
 class Encoder:
     def __init__(self, interrupt_pin: int, ppr: int, debounce_us: float=0):
         """
+        Cria um novo encoder rotatório óptico.
         interrupt_pin: o pino que vai receber os pulsos do OUT do encoder.
         ppr: (pulses per revolution) quantos pulsos o encoder gera para uma volta completa.
         debounce_us: em microssegundos, o intervalo de debounce (ignora pulsos dentro do intervalo)
@@ -119,3 +121,47 @@ class Encoder:
     def stop(self):
         self._cb.cancel()
         self.pi.stop()
+
+
+class Wheel:
+    def __init__(self, wheel_diameter_cm: float, motor: DCMotor, encoder: Encoder | None = None):
+        """
+        Cria uma roda, opcionalmente com um encoder.
+        wheel_diameter_cm: o diâmetro da roda em centímetros.
+        motor: um objeto da classe DCMotor, representando o motor DC que moverá a roda.
+        encoder (opcional): um objeto Encoder, usado para medir velocidade angular, distância percorrida etc.
+        """
+
+        self.encoder = encoder
+        self.motor = motor
+        self.wheel_diameter_cm = wheel_diameter_cm
+        self._wheel_circumference_cm = math.pi * self.wheel_diameter_cm
+
+    def has_encoder(self):
+        return self.encoder is not None
+    
+    def get_speed_cm_s(self):
+        if not self.has_encoder():
+            return 0.0
+        
+        rpm = self.encoder.get_rpm()
+        rps = rpm / 60.0
+        return rps * self._wheel_circumference_cm
+    
+    def set_throttle(self, duty_percent: int):
+        "duty_percent pode ser positivo para ir para frente, ou negativo para ré"
+
+        if duty_percent > 0:
+            self.motor.forward(duty_percent)
+        elif duty_percent < 0:
+            self.motor.reverse(-duty_percent)
+        else:
+            self.motor.stop()   # duty_percent é zero
+    
+    def stop(self):
+        self.motor.stop()
+    
+    def close(self):
+        if self.has_encoder():
+            self.encoder.stop()
+        self.motor.close()
