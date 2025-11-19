@@ -1,5 +1,6 @@
 import math
 import pigpio
+from simple_pid import PID
 import time
 import threading
 
@@ -165,3 +166,21 @@ class Wheel:
         if self.has_encoder():
             self.encoder.stop()
         self.motor.close()
+
+
+class SpeedPID:
+    def __init__(self, kp:float, ki:float, kd:float, setpoint:float=0.0, output_lim:tuple=(-100,100)):
+        self.pid = PID(kp, ki, kd, setpoint=setpoint)
+        self.pid.output_limits = output_lim
+        self.pid.sample_time = 0.05     # id est: 20 Hz
+
+    def update(self, current_speed:float) -> float:
+        return self.pid(current_speed)
+    
+    def set_target(self, target: float):
+        self.pid.setpoint = target
+
+    def reset(self):
+        self.pid.reset()
+
+
