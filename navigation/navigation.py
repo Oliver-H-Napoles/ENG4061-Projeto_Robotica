@@ -187,13 +187,113 @@ class SpeedPID:
 
 class RobotChassis:     # A classe principal :O
     def __init__(self):
+        # Componentes
         self.l_wheel_motor = DCMotor(12, 5 ,6, 500)
-        self.r_wheel_motor = DCMotor(13, 7, 8, 500)
-        
+        self.r_wheel_motor = DCMotor(13, 7, 8, 500) 
         self.l_wheel_encoder = Encoder(17, 32)
         self.r_wheel_encoder = Encoder(23, 32)
 
+        self.l_wheel = Wheel(5.0, self.l_wheel_motor, self.l_wheel_encoder)
+        self.r_wheel = Wheel(5.0, self.r_wheel_motor, self.r_wheel_encoder)
 
+        # Controles PID
+        self.l_pid = SpeedPID(1.5, 0.5, 0.05, setpoint=0)
+        self.r_pid = SpeedPID(1.5, 0.5, 0.05, setpoint=0)
+
+        # Odometria
+        self.x = 0.0
+        self.y = 0.0
+        self.theta = 0.0
+        self.track_width = 17.0     # distancia entre as duas rodas
+
+        # Threading
+        self._lock = threading.Lock()
+        self._running = False
+        self._thread = None
+        self.target_v_left = 0.0
+        self.target_v_right = 0.0
+
+        self._last_time = time.time()
+    
+    def start(self):
+        if not self._running:
+            self._running = True
+            self._last_time = time.time()
+            self._thread = threading.Thread(target=self._loop_runner, daemon=True)
+            self._thread.start()
+            print("RobotChassis: Sistema iniciado.")
+        
+    def _loop_runner(self):
+        RATE_HZ = 20.0
+        dt_target = 1.0 / RATE_HZ
+
+        while self._running:
+            start = time.time()
+            self.update()
+            elapsed = time.time() - start
+            sleep_time = dt_target - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+        
+    def update(self):
+        now = time.time()
+        dt = now - self._last_time
+        self._last_time = now
+
+        if dt <= 0: return
+
+        vl_current = self.l_wheel.get_speed_cm_s()
+        vr_current = self.r_wheel.get_speed_cm_s()
+
+        pwm_l = self.l_pid.update(vl_current)
+        pwm_r = self.r_pid.update(vr_current)
+
+        self.l_wheel.set_throttle(pwm_l)
+        self.r_wheel.set_throttle(pwm_r)
+        
+        # velocidade linear do robô (média das 2 rodas)
+        v_robot = (vl_current + vr_current) / 2.0
+
+        # velocidade angular (omega) = diferença das rodas / largura
+        w_robot = (vr_current - vl_current) / self.track_width
+
+        with self._lock:
+            self.theta += w_robot * dt      # theta = theta0 + w * delta_t
+
+            # arctan(sin(theta), cos(theta)) --> resultado entre -pi e +pi
+            self.theta = math.atan2(math.sin(self.theta), math.cos(self.theta))
+
+            # projeção no mapa (le trigonometria)
+            self.x += v_robot * math.cos(self.theta) * dt       # x = x0 + v * cos(theta) * delta_t 
+            self.y += v_robot * math.sin(self.theta) * dt       # y = y0 + v * sin(theta) * delta_t
+
+    def set_velocity(self, linear_cm_s, angular_deg_s):
+        angular_rad_s = math.radians(angular_deg_s)
+        
+        # differential drive 
+        target_l = linear_cm_s - (angular_rad_s * self.track_width / 2.0)
+        target_r = linear_cm_s + (angular_rad_s * self.track_width / 2.0)
+
+        # atualizando setpoints dos PIDs (novos alvos!)
+        self.l_pid.setpoint = target_l
+        self.r_pid.setpoint = target_r
+
+    def reset_pose(self, x, y, theta_deg):
+        with self._lock:
+            self.x = x
+            self.y = y
+            self.theta = math.radians(theta_deg)
+            print(f"Odometria corrigida: X={x}  Y={y}  theta={theta_deg}°={self.theta} rad")
+    
+    def move_fork(self, height_cm):
+        pass
+    
+    def stop(self):
+        self._running = False
+        if self._thread:
+            self._thread.join()
+        self.l_wheel.stop()
+        self.r_wheel.stop()
 
 if __name__ == "__main__":
     lwheel = DCMotor(12, 5, 6, 500)
