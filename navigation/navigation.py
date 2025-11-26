@@ -84,14 +84,18 @@ class Encoder:
             pigpio.EITHER_EDGE,
             self._pulse_callback
         )
+    
+    def __str__(self):
+        return f"Encoder @ GPIO{self.interrupt_pin}"
 
     def _pulse_callback(self, gpio, level, tick):
         if self.debounce_us > 0:
             if (tick - self.last_tick) < self.debounce_us:
                 return      # está dentro do intervalo de debouncing
             self.last_tick = tick
-        
+            
         with self._lock:    # evita concorrência de threads
+            #print(f"{self}: ticked!")
             self.pulses += 1
     
     def get_pulses(self):
@@ -137,12 +141,9 @@ class Wheel:
         self.motor = motor
         self.wheel_diameter_cm = wheel_diameter_cm
         self._wheel_circumference_cm = math.pi * self.wheel_diameter_cm
-
-    def has_encoder(self):
-        return self.encoder is not None
     
     def get_speed_cm_s(self):
-        if not self.has_encoder():
+        if not self.encoder:
             return 0.0
         
         rpm = self.encoder.get_rpm()
@@ -163,7 +164,7 @@ class Wheel:
         self.motor.stop()
     
     def close(self):
-        if self.has_encoder():
+        if self.encoder:
             self.encoder.stop()
         self.motor.close()
 
@@ -184,3 +185,24 @@ class SpeedPID:
         self.pid.reset()
 
 
+class RobotChassis:     # A classe principal :O
+    def __init__(self):
+        self.l_wheel_motor = DCMotor(12, 5 ,6, 500)
+        self.r_wheel_motor = DCMotor(13, 7, 8, 500)
+        
+        self.l_wheel_encoder = Encoder(17, 32)
+        self.r_wheel_encoder = Encoder(23, 32)
+
+
+
+if __name__ == "__main__":
+    lwheel = DCMotor(12, 5, 6, 500)
+    rwheel = DCMotor(13, 7, 8, 500)
+    l_wheel_encoder = Encoder(17, 32)
+    try:
+        lwheel.forward(100)
+        rwheel.forward(100)
+    except KeyboardInterrupt:
+        lwheel.stop()
+        rwheel.stop()
+        
