@@ -4,12 +4,22 @@ Sistema de Controle de Missão - Empilhadeira Autônoma
 Servidor Flask com WebSockets para controle em tempo real
 """
 
-from flask import Flask, render_template, jsonify
+import sys
+import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+from flask import Flask, render_template, jsonify, Response
 from flask_socketio import SocketIO, emit
 import logging
 from datetime import datetime
 import threading
 import time
+import cv2
+
+from vision.tag_detection import VisionSystem
 
 # Configuração de logging
 logging.basicConfig(
@@ -25,14 +35,56 @@ app.config['SECRET_KEY'] = 'empilhadeira-iot-secret-2025'
 # Inicialização do SocketIO
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
+# Inicialização do sistema de visão de tag
+vision_system = VisionSystem(family='tag36h11')
+
 # Estado global do sistema
 system_state = {
     'mode': 'IDLE',  # IDLE, TELEOP, AUTONOMOUS
     'robot_pose': {'x': 0.0, 'y': 0.0, 'theta': 0.0},
     'fork_height': 0.0,
     'connected_clients': 0,
-    'last_update': None
+    'last_update': None,
+    'visible_tags': []
 }
+
+# ============================================================================
+# GERADOR DE VÍDEO (Usando o módulo importado)
+# ============================================================================
+def generate_frames():
+    """
+    Gera stream MJPEG capturando frame, passando pelo VisionSystem e retornando JPEG.
+    """
+    camera = cv2.VideoCapture(0)
+    # Resolução baixa para performance no Raspberry Pi
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+    
+    if not camera.isOpened():
+        logger.error("[CAM] Não foi possível abrir a câmera")
+        return
+
+    while True:
+        success, frame = camera.read()
+        if not success:
+            break
+        
+        # Passamos o frame cru para o seu script processar
+        # Ele devolve o frame desenhado e a lista de resultados
+        frame, results = vision_system.detect_tags(frame, draw=True)
+        
+        # Atualizamos a variável global com os IDs encontrados
+        current_ids = [r.tag_id for r in results]
+        system_state['visible_tags'] = current_ids
+
+        # Codifica para JPEG para enviar ao navegador
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
+
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+    camera.release()
 
 
 # ============================================================================
@@ -45,6 +97,10 @@ def index():
     logger.info("Servindo página principal")
     return render_template('index.html')
 
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/api/status')
 def api_status():
@@ -128,11 +184,7 @@ def handle_fork_height(data):
 
 @socketio.on('request_video_stream')
 def handle_video_request():
-    """Cliente solicitou stream de vídeo"""
-    logger.info("[VIDEO] Cliente solicitou stream de vídeo")
-    
-    # TODO: Implementar streaming de vídeo em issue futura
-    emit('video_status', {'status': 'not_implemented'})
+    emit('video_status', {'status': 'streaming', 'url': '/video_feed'})
 
 
 # ============================================================================

@@ -51,15 +51,18 @@
                 </div>
             </section>
 
-            <!-- Teste de Comunicação -->
+            <!-- Stream de Vídeo -->
             <section class="panel">
-                <h2>Teste de Comunicação </h2>
-                <div class="test-controls">
-                    <button id="btn-ping" class="btn btn-primary">Enviar Ping</button>
-                    <button id="btn-clear-log" class="btn btn-secondary">Limpar Log</button>
+                <h2>Câmera em Tempo Real</h2>
+                <!-- Substituí o placeholder pela imagem do feed -->
+                <div class="video-container" style="text-align: center; background-color: #000; border-radius: 8px; overflow: hidden; padding: 5px;">
+                    <img id="camera-stream" 
+                         src="/video_feed" 
+                         alt="Aguardando vídeo..." 
+                         style="width: 100%; max-width: 640px; height: auto; display: block; margin: 0 auto;">
                 </div>
-                <div id="ping-log" class="log-container">
-                    <p class="log-empty">Aguardando teste de comunicação...</p>
+                <div style="text-align: center; margin-top: 10px;">
+                    <small style="color: #666;">AprilTag Detector Ativo | Resolução: 320x240</small>
                 </div>
             </section>
 
@@ -92,14 +95,19 @@
                     <button id="btn-set-fork" class="btn btn-primary">Definir Altura</button>
                 </div>
             </section>
-
-            <!-- Stream de Vídeo (placeholder) -->
+            
+            <!-- Teste de Comunicação -->
             <section class="panel">
-                <h2>Câmera (Em desenvolvimento)</h2>
-                <div class="video-placeholder">
-                    <p>Stream de vídeo será implementado em issue futura</p>
+                <h2>Teste de Comunicação </h2>
+                <div class="test-controls">
+                    <button id="btn-ping" class="btn btn-primary">Enviar Ping</button>
+                    <button id="btn-clear-log" class="btn btn-secondary">Limpar Log</button>
+                </div>
+                <div id="ping-log" class="log-container">
+                    <p class="log-empty">Aguardando teste de comunicação...</p>
                 </div>
             </section>
+
         </main>
 
         <!-- Footer -->

@@ -3,7 +3,6 @@ import apriltag
 import numpy as np
 import logging
 
-# Configuração de log específica para este módulo
 logger = logging.getLogger(__name__)
 
 class VisionSystem:
@@ -65,17 +64,17 @@ class VisionSystem:
         if not self.initialized:
             return frame, []
 
-        # 1. Converter para escala de cinza
+        # Converter para grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # 2. Detectar
+        # Detectar
         results = self.detector.detect(gray)
         
         # Se não precisa desenhar, retorna logo os resultados para ganhar tempo
         if not draw:
             return frame, results
 
-        # 3. Desenhar (se solicitado)
+        # Desenhar (se solicitado)
         for r in results:
             # Extrair coordenadas (convertendo float para int)
             (ptA, ptB, ptC, ptD) = r.corners
