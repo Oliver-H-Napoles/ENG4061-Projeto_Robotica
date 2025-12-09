@@ -1,14 +1,16 @@
 import cv2
 import apriltag
+import numpy as np
 import logging
 
 # Configuração de log específica para este módulo
 logger = logging.getLogger(__name__)
 
 class VisionSystem:
-    def __init__(self, family="tag36h11"):
+    def __init__(self, family="tag36h11", tag_size_meters=0.05, resolution=(1280, 720)):
         """
         Inicializa o sistema de visão e o detector AprilTag.
+        Calcula matriz de distorção da câmera Logitech C525.
         Carrega o detector apenas uma vez na memória.
         """
         try:
@@ -19,6 +21,38 @@ class VisionSystem:
         except Exception as e:
             logger.error(f"Falha ao iniciar detector AprilTag: {e}")
             self.initialized = False
+        
+        W, H = resolution
+
+        if W == 1280:   # Usando 1280x720 (720p)
+            fx = 1068.0
+            fy = 1068.0
+            cx = 640.0
+            cy = 360.0
+        elif W == 640:  # Usando 640x480 (480p) 
+            fx = 534.0  
+            fy = 534.0
+            cx = 320.0
+            cy = 240.0
+        else:           # Fallback genérico se usar outra resolução
+            logger.warning("Resolução desconhecida, usando f=W")
+            fx = float(W)
+            fy = float(W)
+            cx = W / 2.0
+            cy = H / 2.0
+        
+        self.camera_matrix = np.array([
+            [fx, 0, cx],
+            [0, fy, cy],
+            [0,  0,  1]
+        ])
+
+        """
+        Assuma que a lente é perfeitamente plana e que linhas retas
+        no mundo continuam perfeitamente retas na câmera
+        """
+        self.dist_coefficients = np.zeros((5,1))
+
 
     def detect_tags(self, frame, draw=True):
         """
