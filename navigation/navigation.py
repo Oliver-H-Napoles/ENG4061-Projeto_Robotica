@@ -300,8 +300,10 @@ if __name__ == "__main__":
     rwheel = DCMotor(13, 7, 8, 500)
     l_wheel_encoder = Encoder(17, 32)
     try:
-        lwheel.forward(100)
-        rwheel.forward(100)
+        lwheel.forward(30)
+        rwheel.forward(30)
+        while True:
+            pass
     except KeyboardInterrupt:
         lwheel.stop()
         rwheel.stop()
