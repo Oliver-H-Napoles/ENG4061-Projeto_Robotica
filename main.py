@@ -12,7 +12,7 @@ MAX_ANGULAR_SPEED = 40.0   # deg/s (Limitador de giro)
 
 # Kp_lin: Converte erro de metros para cm/s
 # Se o erro for 0.5m, e Kp=40, ele anda a 20 cm/s
-KP_LINEAR = 40.0           
+KP_LINEAR = 100.0           
 
 # Kp_ang: Converte erro lateral (metros) para deg/s
 # Se o erro for 0.1m (10cm), e Kp=300, ele gira a 30 deg/s
@@ -52,8 +52,10 @@ def main():
                         break
 
             if target_tag is not None:
-                x_m = target_tag.pose_t[0][0]   # desvio lateral (metros)
-                z_m = target_tag.pose_t[0][2]   # distancia ate tag (metros)
+                x_m = target_tag.pose_t[0]   # desvio lateral (metros)
+                z_m = target_tag.pose_t[2]   # distancia ate tag (metros)
+
+                print(f"Achou tag! x={x_m} z={z_m}")
 
                 error_dist = z_m - TARGET_DISTANCE_M
                 error_ang = -x_m
@@ -82,8 +84,8 @@ def main():
     finally:
         print("Parando robô")
         chassis.stop()
-        chassis.l_wheel.close()
-        chassis.r_wheel.close()
+        chassis.l_wheel_motor.close()
+        chassis.r_wheel_motor.close()
         cap.release()
         cv2.destroyAllWindows()
 

@@ -185,123 +185,91 @@ class SpeedPID:
         self.pid.reset()
 
 
-class RobotChassis:     # A classe principal :O
+class RobotChassis:
     def __init__(self):
-        # Componentes
+        # --- CONFIGURAÇÃO DE HARDWARE ---
         self.l_wheel_motor = DCMotor(12, 5 ,6, 500)
         self.r_wheel_motor = DCMotor(13, 7, 8, 500) 
-        self.l_wheel_encoder = Encoder(17, 32)
-        self.r_wheel_encoder = Encoder(23, 32)
 
-        self.l_wheel = Wheel(5.0, self.l_wheel_motor, self.l_wheel_encoder)
-        self.r_wheel = Wheel(5.0, self.r_wheel_motor, self.r_wheel_encoder)
-
-        # Controles PID
-        self.l_pid = SpeedPID(1.5, 0.5, 0.05, setpoint=0)
-        self.r_pid = SpeedPID(1.5, 0.5, 0.05, setpoint=0)
-
-        # Odometria
-        self.x = 0.0
-        self.y = 0.0
-        self.theta = 0.0
-        self.track_width = 17.0     # distancia entre as duas rodas
-
-        # Threading
-        self._lock = threading.Lock()
-        self._running = False
-        self._thread = None
-        self.target_v_left = 0.0
-        self.target_v_right = 0.0
-
-        self._last_time = time.time()
-    
-    def start(self):
-        if not self._running:
-            self._running = True
-            self._last_time = time.time()
-            self._thread = threading.Thread(target=self._loop_runner, daemon=True)
-            self._thread.start()
-            print("RobotChassis: Sistema iniciado.")
+        # --- PARÂMETROS FÍSICOS ---
+        self.track_width = 17.0     # Distância entre as rodas (cm)
         
-    def _loop_runner(self):
-        RATE_HZ = 20.0
-        dt_target = 1.0 / RATE_HZ
+        # --- CALIBRAÇÃO (O "Pulo do Gato" sem encoder) ---
+        # Você precisa estimar: qual a velocidade do robô quando o PWM é 100%?
+        # Se você não sabe, chute um valor (ex: 50 cm/s) e ajuste depois.
+        # Se o robô estiver andando mais rápido do que o VisionSystem pede, AUMENTE esse valor.
+        # Se estiver muito lento, DIMINUA esse valor.
+        self.estimated_max_speed_cm_s = 60.0 
 
-        while self._running:
-            start = time.time()
-            self.update()
-            elapsed = time.time() - start
-            sleep_time = dt_target - elapsed
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-        
-    def update(self):
-        now = time.time()
-        dt = now - self._last_time
-        self._last_time = now
-
-        if dt <= 0: return
-
-        vl_current = self.l_wheel.get_speed_cm_s()
-        vr_current = self.r_wheel.get_speed_cm_s()
-
-        pwm_l = self.l_pid.update(vl_current)
-        pwm_r = self.r_pid.update(vr_current)
-
-        self.l_wheel.set_throttle(pwm_l)
-        self.r_wheel.set_throttle(pwm_r)
-        
-        # velocidade linear do robô (média das 2 rodas)
-        v_robot = (vl_current + vr_current) / 2.0
-
-        # velocidade angular (omega) = diferença das rodas / largura
-        w_robot = (vr_current - vl_current) / self.track_width
-
-        with self._lock:
-            self.theta += w_robot * dt      # theta = theta0 + w * delta_t
-
-            # arctan(sin(theta), cos(theta)) --> resultado entre -pi e +pi
-            self.theta = math.atan2(math.sin(self.theta), math.cos(self.theta))
-
-            # projeção no mapa (le trigonometria)
-            self.x += v_robot * math.cos(self.theta) * dt       # x = x0 + v * cos(theta) * delta_t 
-            self.y += v_robot * math.sin(self.theta) * dt       # y = y0 + v * sin(theta) * delta_t
+        # Calibração pra roda esquerda girar certo...
+        self.l_trim = 1.4   
 
     def set_velocity(self, linear_cm_s, angular_deg_s):
+        """
+        Converte velocidade desejada (cm/s) diretamente para PWM (0-100)
+        sem feedback de sensores.
+        """
         angular_rad_s = math.radians(angular_deg_s)
         
-        # differential drive 
-        target_l = linear_cm_s - (angular_rad_s * self.track_width / 2.0)
-        target_r = linear_cm_s + (angular_rad_s * self.track_width / 2.0)
+        # 1. Cálculo Differential Drive (Cinemática)
+        # Calcula a velocidade linear necessária para cada roda em cm/s
+        target_v_l = linear_cm_s - (angular_rad_s * self.track_width / 2.0)
+        target_v_r = linear_cm_s + (angular_rad_s * self.track_width / 2.0)
 
-        # atualizando setpoints dos PIDs (novos alvos!)
-        self.l_pid.setpoint = target_l
-        self.r_pid.setpoint = target_r
+        # 2. Conversão para PWM (Regra de 3 simples)
+        # PWM = (Velocidade_Alvo / Velocidade_Maxima) * 100
+        pwm_l = (target_v_l / self.estimated_max_speed_cm_s) * 100.0
+        pwm_r = (target_v_r / self.estimated_max_speed_cm_s) * 100.0
 
-    def reset_pose(self, x, y, theta_deg):
-        with self._lock:
-            self.x = x
-            self.y = y
-            self.theta = math.radians(theta_deg)
-            print(f"Odometria corrigida: X={x}  Y={y}  theta={theta_deg}°={self.theta} rad")
-    
-    def move_fork(self, height_cm):
-        pass
-    
+        # 2.5. Calibrar roda
+        pwm_l = pwm_l * self.l_trim
+
+        # 3. Aplicar aos motores com limites
+        self._set_motor_power(self.l_wheel_motor, pwm_l)
+        self._set_motor_power(self.r_wheel_motor, pwm_r)
+
+    def _set_motor_power(self, motor, pwm_value):
+        """
+        Função auxiliar para lidar com PWM positivo (frente), negativo (ré) 
+        e limite de 100%.
+        """
+        # Limita entre -100 e 100 (Clamp)
+        pwm_value = max(min(pwm_value, 100.0), -100.0)
+
+        # Zona morta simples (motores DC geralmente não giram com menos de 10-15% de força)
+        # Isso evita que o motor fique zumbindo sem sair do lugar
+        if abs(pwm_value) < 10.0:
+            motor.stop()
+            return
+
+        if pwm_value > 0:
+            motor.forward(abs(pwm_value))
+        elif pwm_value < 0:
+            motor.reverse(abs(pwm_value))
+        else:
+            motor.stop()
+
+    def start(self):
+        # Método mantido apenas para compatibilidade com seu main.py
+        print("RobotChassis (Open Loop): Sistema pronto.")
+
     def stop(self):
-        self._running = False
-        if self._thread:
-            self._thread.join()
-        self.l_wheel.stop()
-        self.r_wheel.stop()
+        self.l_wheel_motor.stop()
+        self.r_wheel_motor.stop()
+        
+    def close(self):
+        # Alias para fechar conexões limpas
+        self.stop()
+        self.l_wheel_motor.close()
+        self.r_wheel_motor.close()
 
 if __name__ == "__main__":
     lwheel = DCMotor(12, 5, 6, 500)
     rwheel = DCMotor(13, 7, 8, 500)
     l_wheel_encoder = Encoder(17, 32)
     try:
-        lwheel.forward(30)
-        rwheel.forward(30)
+        lwheel.forward(100)
+        rwheel.forward(100)
         while True:
             pass
     except KeyboardInterrupt:
