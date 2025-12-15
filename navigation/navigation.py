@@ -173,7 +173,7 @@ class SpeedPID:
     def __init__(self, kp:float, ki:float, kd:float, setpoint:float=0.0, output_lim:tuple=(-100,100)):
         self.pid = PID(kp, ki, kd, setpoint=setpoint)
         self.pid.output_limits = output_lim
-        self.pid.sample_time = 0.05     # id est: 20 Hz
+        self.pid.sample_time = 0.05     # 20 Hz, um vigésimo de segundo
 
     def update(self, current_speed:float) -> float:
         return self.pid(current_speed)
@@ -187,18 +187,12 @@ class SpeedPID:
 
 class RobotChassis:
     def __init__(self):
-        # --- CONFIGURAÇÃO DE HARDWARE ---
         self.l_wheel_motor = DCMotor(12, 5 ,6, 500)
         self.r_wheel_motor = DCMotor(13, 7, 8, 500) 
 
-        # --- PARÂMETROS FÍSICOS ---
         self.track_width = 17.0     # Distância entre as rodas (cm)
         
-        # --- CALIBRAÇÃO (O "Pulo do Gato" sem encoder) ---
-        # Você precisa estimar: qual a velocidade do robô quando o PWM é 100%?
-        # Se você não sabe, chute um valor (ex: 50 cm/s) e ajuste depois.
-        # Se o robô estiver andando mais rápido do que o VisionSystem pede, AUMENTE esse valor.
-        # Se estiver muito lento, DIMINUA esse valor.
+        # Qual a velocidade do robo quando ele esta com duty cycle de 100%?
         self.estimated_max_speed_cm_s = 60.0 
 
         # Calibração pra roda esquerda girar certo...
@@ -211,20 +205,20 @@ class RobotChassis:
         """
         angular_rad_s = math.radians(angular_deg_s)
         
-        # 1. Cálculo Differential Drive (Cinemática)
-        # Calcula a velocidade linear necessária para cada roda em cm/s
+        # velocidade linear necessária para cada roda em cm/s
         target_v_l = linear_cm_s - (angular_rad_s * self.track_width / 2.0)
         target_v_r = linear_cm_s + (angular_rad_s * self.track_width / 2.0)
 
-        # 2. Conversão para PWM (Regra de 3 simples)
+        # conversão para PWM 
         # PWM = (Velocidade_Alvo / Velocidade_Maxima) * 100
         pwm_l = (target_v_l / self.estimated_max_speed_cm_s) * 100.0
         pwm_r = (target_v_r / self.estimated_max_speed_cm_s) * 100.0
 
-        # 2.5. Calibrar roda
+        # cada roda tava girando em uma velocidade angular diferente com o mesmo PWM
+        # isso aqui é uma multiplicação q conserta 
         pwm_l = pwm_l * self.l_trim
 
-        # 3. Aplicar aos motores com limites
+        # aplicar aos motores com limites
         self._set_motor_power(self.l_wheel_motor, pwm_l)
         self._set_motor_power(self.r_wheel_motor, pwm_r)
 
@@ -236,8 +230,7 @@ class RobotChassis:
         # Limita entre -100 e 100 (Clamp)
         pwm_value = max(min(pwm_value, 100.0), -100.0)
 
-        # Zona morta simples (motores DC geralmente não giram com menos de 10-15% de força)
-        # Isso evita que o motor fique zumbindo sem sair do lugar
+        # deadzone
         if abs(pwm_value) < 10.0:
             motor.stop()
             return
@@ -250,7 +243,6 @@ class RobotChassis:
             motor.stop()
 
     def start(self):
-        # Método mantido apenas para compatibilidade com seu main.py
         print("RobotChassis (Open Loop): Sistema pronto.")
 
     def stop(self):
@@ -258,7 +250,6 @@ class RobotChassis:
         self.r_wheel_motor.stop()
         
     def close(self):
-        # Alias para fechar conexões limpas
         self.stop()
         self.l_wheel_motor.close()
         self.r_wheel_motor.close()

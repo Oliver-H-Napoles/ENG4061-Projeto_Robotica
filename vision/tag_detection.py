@@ -45,9 +45,9 @@ class VisionSystem:
             cx = W / 2.0
             cy = H / 2.0
 
-        # Necessário para pose
         self.camera_params = (fx, fy, cx, cy)
 
+        # coeficientes da câmera (dist. focal, deslocamento etc.)
         self.dist_coefficients = np.zeros((5, 1))
         self.camera_matrix = np.array([
             [fx, 0, cx],
@@ -59,7 +59,7 @@ class VisionSystem:
         if not self.initialized:
             return frame, []
 
-        # Pupils DEMANDA grayscale
+        # a biblioteca espera uma img em preto e branco
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # Detectar com cálculo de pose
@@ -78,10 +78,10 @@ class VisionSystem:
             # corners já vêm como array Nx2
             corners = d.corners.astype(int)
 
-            # Desenha as 4 linhas
+            # desenhar as 4 linhas da box
             cv2.polylines(frame, [corners], True, (0, 255, 0), 2)
 
-            # centro
+            # centro da apriltag!
             cX, cY = map(int, d.center)
             cv2.circle(frame, (cX, cY), 5, (0, 0, 255), -1)
 

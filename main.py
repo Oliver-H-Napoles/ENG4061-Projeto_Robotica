@@ -6,15 +6,15 @@ import numpy as np
 from vision.tag_detection import VisionSystem
 from navigation.navigation import RobotChassis
 
-TARGET_DISTANCE_M = 0.30   # O robô deve parar a 30cm da tag
-MAX_LINEAR_SPEED = 20.0    # cm/s (Limitador de segurança)
-MAX_ANGULAR_SPEED = 40.0   # deg/s (Limitador de giro)
+TARGET_DISTANCE_M = 0.30   # o robô deve parar a 30 cm da tag!
+MAX_LINEAR_SPEED = 20.0    # cm/s (Limitador de segurança, vel. linear)
+MAX_ANGULAR_SPEED = 40.0   # deg/s (Limitador do giro, vel. angular)
 
-# Kp_lin: Converte erro de metros para cm/s
+# Kp_linear: Converte erro de metros para cm/s
 # Se o erro for 0.5m, e Kp=40, ele anda a 20 cm/s
 KP_LINEAR = 100.0           
 
-# Kp_ang: Converte erro lateral (metros) para deg/s
+# Kp_angular: Converte erro lateral (metros) para deg/s
 # Se o erro for 0.1m (10cm), e Kp=300, ele gira a 30 deg/s
 KP_ANGULAR = 300.0
 
@@ -65,11 +65,11 @@ def main():
             
             else:
                 # Se a lista estiver vazia OU se a lista tem tags mas não a que queremos
-                # O robô deve parar (segurança)
+                # O robô deve parar por segurança
                 linear_cmd = 0.0
                 angular_cmd = 0.0
             
-            # Segurança: respeitar limites máximos
+            # Segurança: robô tem que respeitar limites máximos
             linear_cmd = np.clip(linear_cmd, -MAX_LINEAR_SPEED, MAX_LINEAR_SPEED)
             angular_cmd = np.clip(angular_cmd, -MAX_ANGULAR_SPEED, MAX_ANGULAR_SPEED)
             

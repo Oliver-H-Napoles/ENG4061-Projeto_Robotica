@@ -49,7 +49,7 @@ system_state = {
 }
 
 # ============================================================================
-# GERADOR DE VÍDEO (Usando o módulo importado)
+# GERADOR DE VÍDEO
 # ============================================================================
 def generate_frames():
     """
@@ -69,15 +69,15 @@ def generate_frames():
         if not success:
             break
         
-        # Passamos o frame cru para o seu script processar
-        # Ele devolve o frame desenhado e a lista de resultados
+        # Passa o frame cru para o script processar e
+        # devolve o frame desenhado e a lista de resultados
         frame, results = vision_system.detect_tags(frame, draw=True)
         
-        # Atualizamos a variável global com os IDs encontrados
+        # atualiza a variável global com os IDs encontrados
         current_ids = [r.tag_id for r in results]
         system_state['visible_tags'] = current_ids
 
-        # Codifica para JPEG para enviar ao navegador
+        # codifica para JPEG para enviar ao navegador
         ret, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()
 
